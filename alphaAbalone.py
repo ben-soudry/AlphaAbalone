@@ -87,7 +87,6 @@ class piece(object):
         self.col = col
         self.color = color
         self.coord = data.board3AxisCoords[row][col]
-        print(self.color, " piece object created")
     def possibleChains(self):
         dirs = [(-1,+1, 0),(0,+1,-1),
             (-1, 0,+1),        (+1,0,-1),
@@ -142,6 +141,7 @@ def keyPressed(event, data):
         bestScore = None
         bestBoard = None
         for possibleBoard in possibleBoards:
+            print("Possible Board: ", possibleBoard)
             boardScore = boardEvaluator(possibleBoard,data)
             if(bestScore == None or boardScore >= bestScore):
                 bestScore = boardScore
@@ -214,7 +214,7 @@ def possibleChains(board,currColor,data):
     chains = []
     for row in range(len(board)):
         for col in range(len(board[row])):
-            if(board[row][col] == currColor and row == 1 and col == 1):
+            if(board[row][col] == currColor):
                 possibleChainsForPiece(board,currColor,data,row,col,chains)
     return chains
 def possibleChainsForPiece(board,currColor,data,row,col,chains):
@@ -242,16 +242,40 @@ def possibleMoves(board,currColor,data):
     #Scans a board and returns a list of all possible moves.
     #The new moves are returned as new board states.
     possibleBoards = []
-    for row in range(len(board)):
-        for col in range(len(board[row])):
-            if(board[row][col] == currColor):
-                #Check for open adjacents
-                for adjacent in getAdjacents(board,None,row,col,data):
-                    newBoard = copy.deepcopy(board)
-                    newBoard[row][col] = None
-                    setColorAtCoords(currColor,newBoard,adjacent,data)
-                    possibleBoards.append(newBoard)
+    dirs = [(-1,+1, 0),(0,+1,-1),
+        (-1, 0,+1),        (+1,0,-1),
+            ( 0,-1,+1),(+1,-1, 0)]
+    chainsList = possibleChains(board,currColor,data)
+    for chain in chainsList:
+        for direction in dirs:
+            print("Checking Chain: ", chain, " in Direction: ", direction)
+            newBoard = possibleMoveForChainInDirection(board,currColor,
+                data,chain,direction)
+            if(newBoard != None):
+                print("This ran")
+                possibleBoards.append(newBoard)
+
     return possibleBoards
+def possibleMoveForChainInDirection(board,currColor,data,chain,direction):
+    newChain = list(copy.deepcopy(chain))
+    (dx,dy,dz) = direction
+    for i in range(len(newChain)):
+        (x,y,z) = newChain[i]
+        newPiece = (x+dx,y+dy,z+dz) 
+        newChain[i] = newPiece
+        if(getColorAtCoords(board,newPiece,data) != None):
+            return None
+    print("This ran")
+    #All pieces can be moved to an empty square, then the move is valid
+    #Now make the new board
+    newBoard = copy.deepcopy(board)
+    for oldPiece in chain:
+        print("Deleted old piece")
+        setColorAtCoords(None,newBoard,oldPiece,data)
+    for newPiece in newChain:
+        print("Created new Piece")
+        setColorAtCoords(currColor,newBoard,newPiece,data)
+    return newBoard
 def getAdjacents(board,color,row,col,data):
     dirs = [(-1,+1, 0),(0,+1,-1),
             (-1, 0,+1),        (+1,0,-1),
