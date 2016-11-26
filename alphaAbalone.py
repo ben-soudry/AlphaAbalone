@@ -134,7 +134,10 @@ def mousePressed(event, data):
     pass
 
 def keyPressed(event, data):
-    if(event.keysym == "m"):
+    if(event.keysym == "c"):
+        chains = possibleChains(data.board,"white",data)
+        print(chains)
+    elif(event.keysym == "m"):
         possibleBoards = possibleMoves(data.board,"black",data)
         bestScore = None
         bestBoard = None
@@ -207,7 +210,34 @@ def drawPieces(canvas,data):
 #AI
 ####
 def possibleChains(board,currColor,data):
-    pass
+    #Returns a list of sets of tuples, where each set is a chain of pieces
+    chains = []
+    for row in range(len(board)):
+        for col in range(len(board[row])):
+            if(board[row][col] == currColor and row == 1 and col == 1):
+                possibleChainsForPiece(board,currColor,data,row,col,chains)
+    return chains
+def possibleChainsForPiece(board,currColor,data,row,col,chains):
+    pieceCoord = data.board3AxisCoords[row][col]
+    chains.append(set([pieceCoord]))
+    dirs = [(-1,+1, 0),(0,+1,-1),
+        (-1, 0,+1),        (+1,0,-1),
+            ( 0,-1,+1),(+1,-1, 0)]
+    for direction in dirs:
+        chainCoords = []
+        (dx,dy,dz) = direction
+        (x,y,z) = pieceCoord
+        chainCoords.append(pieceCoord)
+        while(getColorAtCoords(board,chainCoords[-1],data) == currColor):
+            if(noRepeats(set(chainCoords),chains) == True):
+                chains.append(set(chainCoords))
+            (x,y,z) = chainCoords[-1]
+            chainCoords.append((x+dx,y+dy,z+dz))
+def noRepeats(currChain, chains):
+    for chain in chains:
+        if(currChain == chain):
+            return False
+    return True
 def possibleMoves(board,currColor,data):
     #Scans a board and returns a list of all possible moves.
     #The new moves are returned as new board states.
