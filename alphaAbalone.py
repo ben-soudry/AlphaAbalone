@@ -140,7 +140,17 @@ def keyPressed(event, data):
         bestBoard = None
         for possibleBoard in possibleBoards:
             boardScore = boardEvaluator(possibleBoard,data)
-            if(bestScore == None or boardScore > bestScore):
+            if(bestScore == None or boardScore >= bestScore):
+                bestScore = boardScore
+                bestBoard = possibleBoard
+        data.board = bestBoard
+    if(event.keysym == "n"):
+        possibleBoards = possibleMoves(data.board,"white",data)
+        bestScore = None
+        bestBoard = None
+        for possibleBoard in possibleBoards:
+            boardScore = boardEvaluator(possibleBoard,data)
+            if(bestScore == None or boardScore <= bestScore):
                 bestScore = boardScore
                 bestBoard = possibleBoard
         data.board = bestBoard
@@ -196,6 +206,8 @@ def drawPieces(canvas,data):
 ####
 #AI
 ####
+def possibleChains(board,currColor,data):
+    pass
 def possibleMoves(board,currColor,data):
     #Scans a board and returns a list of all possible moves.
     #The new moves are returned as new board states.
