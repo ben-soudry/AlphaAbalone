@@ -7,6 +7,7 @@ import copy
 ####################################
 
 def init(data):
+    testIsInline()
     data.boardWidth = 550
     data.hexesPerSide = 5 #A standard abalone board has side length 5 hexes
     data.hexesAcross = 2*data.hexesPerSide-1
@@ -76,7 +77,7 @@ def getColorAtCoords(board,coords,data):
                 return board[row][col]
     return False
 def setColorAtCoords(color,board,coords,data):
-    print("Setting ", color, " at ", coords)
+    #print("Setting ", color, " at ", coords)
     for row in range(len(board)):
         for col in range(len(board[row])):
             if(data.board3AxisCoords[row][col] == coords):
@@ -134,7 +135,7 @@ def mousePressed(event, data):
 
 def keyPressed(event, data):
     if(event.keysym == "c"):
-        chains = possibleChains(data.board,"white",data)
+        chains = possibleChains(data.board,"black",data)
         print(chains)
     elif(event.keysym == "m"):
         possibleBoards = possibleMoves(data.board,"black",data)
@@ -248,14 +249,28 @@ def possibleMoves(board,currColor,data):
     chainsList = possibleChains(board,currColor,data)
     for chain in chainsList:
         for direction in dirs:
-            print("Checking Chain: ", chain, " in Direction: ", direction)
+            #print("Checking Chain: ", chain, " in Direction: ", direction)
             newBoard = possibleMoveForChainInDirection(board,currColor,
                 data,chain,direction)
             if(newBoard != None):
-                print("This ran")
                 possibleBoards.append(newBoard)
-
     return possibleBoards
+def testIsInline():
+    print("Testing isInline...", end = "")
+    assert(isInline([(0,-1,1),(1,-2,1),(2,-3,1)],(-1,+1, 0)))
+    assert(isInline([(1,-2,1),(0,-1,1),(2,-3,1)],(-1,+1, 0)))
+    assert(isInline([(1,-2,1),(0,-1,1),(2,-3,1)],(+1,-1, 0)))
+    print("Passed")
+def isInline(chain,direction):
+    for i in range(len(chain)-1):
+        (x1,y1,z1) = chain[i]
+        (x2,y2,z2) = chain[i+1]
+        maxFactor = max(abs(x1-x2),abs(y1-y2),abs(z1-z2))
+        chainDiff = ((x1-x2)//maxFactor,(y1-y2)//maxFactor,(z1-z2)//maxFactor)
+        chainDiffReverse = ((x2-x1)//maxFactor,(y2-y1)//maxFactor,(z2-z1)//maxFactor)
+        if(chainDiff != direction and chainDiffReverse != direction): 
+            return False
+    return True
 def possibleMoveForChainInDirection(board,currColor,data,chain,direction):
     newChain = list(copy.deepcopy(chain))
     (dx,dy,dz) = direction
@@ -267,28 +282,75 @@ def possibleMoveForChainInDirection(board,currColor,data,chain,direction):
         if(getColorAtCoords(board,newPiece,data) != None):
             broadsideMovePossible = False
     if(broadsideMovePossible):
+        print("Make Broadside Move")
         return makeMove(board,currColor,data,chain,newChain)
-    #Now check for a possible inline move
+    #Now check for a possible inline move or inline push
+    if(isInline(newChain,direction) == False):
+        return None
     inlineMovePossible = True
+    pushMovePossible = True
+    opposingChainStart = None
     newBoard = copy.deepcopy(board)
     for oldPiece in chain:
         setColorAtCoords(None,newBoard,oldPiece,data)
     for newPiece in newChain:
-        if(getColorAtCoords(newBoard,newPiece,data) != None):
+        checkSpot = getColorAtCoords(newBoard,newPiece,data)
+        if(checkSpot != None):
             inlineMovePossible = False
+            if(checkSpot == currColor):
+                pushMovePossible = False
+            else: #Opposite color
+                opposingChainStart = newPiece
     if(inlineMovePossible):
+        print("Make Inline Move")
         return makeMove(board,currColor,data,chain,newChain)
+    elif(pushMovePossible):
+        print("Make Inline Push Move")
+        return makePushMove(board,currColor,data,chain,newChain,direction,opposingChainStart)
+    
 def makeMove(board,currColor,data,chain,newChain):
     #All pieces can be moved to an empty square, then the move is valid
     #Now make the new board
     newBoard = copy.deepcopy(board)
     for oldPiece in chain:
-        print("Deleted old piece")
         setColorAtCoords(None,newBoard,oldPiece,data)
     for newPiece in newChain:
-        print("Created new Piece")
         setColorAtCoords(currColor,newBoard,newPiece,data)
     return newBoard
+def makePushMove(board,currColor,data,chain,newChain,direction,opposingChainStart):
+    #Get the length of the current chain:
+    print("New chain: ", newChain)
+    currChainLength = len(newChain)
+    #Now, figure out the length of the opposing chain.
+    opposingColor = getOpposingColor(currColor)
+    currPiece = opposingChainStart
+    opposingChainLength = 0
+    opposingChain = []
+    while(getColorAtCoords(board,currPiece,data) == opposingColor):
+        opposingChain.append(currPiece)
+        (x,y,z) = currPiece
+        (dx,dy,dz) = direction
+        currPiece = (x+dx,y+dy,z+dz)
+        opposingChainLength += 1
+    print("currChainLength: ", currChainLength)
+    print("opposingChainLength: ", opposingChainLength)
+    if(currChainLength > opposingChainLength):
+        #first move the opposing chain:
+        newOpposingChain = copy.deepcopy(opposingChain)
+        for i in range(len(opposingChain)):
+            (x,y,z) = newOpposingChain[i]
+            newPiece = (x+dx,y+dy,z+dz) 
+            newOpposingChain[i] = newPiece
+            if(getColorAtCoords(board,newPiece,data) == currColor):
+                return None
+        newBoard = makeMove(board,opposingColor,data,opposingChain,newOpposingChain)
+        return makeMove(newBoard,currColor,data,chain,newChain)
+def getOpposingColor(currColor):
+    if(currColor == "white"):
+        return "black"
+    else:
+        return "white"
+
 def getAdjacents(board,color,row,col,data):
     dirs = [(-1,+1, 0),(0,+1,-1),
             (-1, 0,+1),        (+1,0,-1),
@@ -334,7 +396,7 @@ def evaluateControlOfCenter(board, data):
                 centerControl += 4-hexDist(centerHex, currHex)
             elif(board[row][col] == "white"):
                 centerControl -= 4-hexDist(centerHex, currHex)
-    print("Center control: ",centerControl)
+    #print("Center control: ",centerControl)
     return centerControl
 def hexDist(hex1,hex2):
     (x1,y1,z1) = hex1
