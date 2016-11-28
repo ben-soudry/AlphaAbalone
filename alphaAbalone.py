@@ -141,9 +141,9 @@ def keyPressed(event, data):
         bestScore = None
         bestBoard = None
         for possibleBoard in possibleBoards:
-            print("Possible Board: ", possibleBoard)
+            #print("Possible Board: ", possibleBoard)
             boardScore = boardEvaluator(possibleBoard,data)
-            if(bestScore == None or boardScore >= bestScore):
+            if(bestScore == None or boardScore > bestScore):
                 bestScore = boardScore
                 bestBoard = possibleBoard
         data.board = bestBoard
@@ -153,7 +153,7 @@ def keyPressed(event, data):
         bestBoard = None
         for possibleBoard in possibleBoards:
             boardScore = boardEvaluator(possibleBoard,data)
-            if(bestScore == None or boardScore <= bestScore):
+            if(bestScore == None or boardScore < bestScore):
                 bestScore = boardScore
                 bestBoard = possibleBoard
         data.board = bestBoard
@@ -259,13 +259,26 @@ def possibleMoves(board,currColor,data):
 def possibleMoveForChainInDirection(board,currColor,data,chain,direction):
     newChain = list(copy.deepcopy(chain))
     (dx,dy,dz) = direction
+    broadsideMovePossible = True
     for i in range(len(newChain)):
         (x,y,z) = newChain[i]
         newPiece = (x+dx,y+dy,z+dz) 
         newChain[i] = newPiece
         if(getColorAtCoords(board,newPiece,data) != None):
-            return None
-    print("This ran")
+            broadsideMovePossible = False
+    if(broadsideMovePossible):
+        return makeMove(board,currColor,data,chain,newChain)
+    #Now check for a possible inline move
+    inlineMovePossible = True
+    newBoard = copy.deepcopy(board)
+    for oldPiece in chain:
+        setColorAtCoords(None,newBoard,oldPiece,data)
+    for newPiece in newChain:
+        if(getColorAtCoords(newBoard,newPiece,data) != None):
+            inlineMovePossible = False
+    if(inlineMovePossible):
+        return makeMove(board,currColor,data,chain,newChain)
+def makeMove(board,currColor,data,chain,newChain):
     #All pieces can be moved to an empty square, then the move is valid
     #Now make the new board
     newBoard = copy.deepcopy(board)
