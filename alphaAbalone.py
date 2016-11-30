@@ -1,4 +1,5 @@
 import math
+import random
 from tkinter import *
 import copy
 
@@ -15,7 +16,8 @@ def init(data):
     data.spotRadius = 23
     data.pieceRadius = 26
     data.textHeight = 30
-    
+    data.gameMode = "menu"
+    data.turn = "white"
     createBoardLists(data)
     setUpBoard(data)
     assign3AxisCoords(data)
@@ -134,42 +136,67 @@ def mousePressed(event, data):
     pass
 
 def keyPressed(event, data):
-    if(event.keysym == "c"):
-        chains = possibleChains(data.board,"black",data)
-        print(chains)
+    if(data.gameMode == "menu"):
+        if(event.keysym == 'p'):
+            data.gameMode = "AI_game"
+    elif(data.gameMode == "AI_game"):
+        keyPressedAIGame(event,data)
+def keyPressedAIGame(event,data):
+    if(event.keysym == "t"):
+        #run minimax
+        data.board = minimax(data,2)
+        print("move made!")
+        if(data.turn == "black"):
+            data.turn = "white"
+        else:
+            data.turn = "black"
     elif(event.keysym == "m"):
-        possibleBoards = possibleMoves(data.board,"black",data)
+        possibleBoards = possibleMoves(data.board,data.turn,data)
         bestScore = None
-        bestBoard = None
+        bestBoards = []
+        print(len(possibleBoards), " moves evaluated")
         for possibleBoard in possibleBoards:
             #print("Possible Board: ", possibleBoard)
             boardScore = boardEvaluator(possibleBoard,data)
-            if(bestScore == None or boardScore > bestScore):
-                bestScore = boardScore
-                bestBoard = possibleBoard
-        data.board = bestBoard
-    if(event.keysym == "n"):
-        possibleBoards = possibleMoves(data.board,"white",data)
-        bestScore = None
-        bestBoard = None
-        for possibleBoard in possibleBoards:
-            boardScore = boardEvaluator(possibleBoard,data)
-            if(bestScore == None or boardScore < bestScore):
-                bestScore = boardScore
-                bestBoard = possibleBoard
-        data.board = bestBoard
-    pass
+            if(data.turn == "black"):
+                if(bestScore == None or boardScore > bestScore):
+                    bestScore = boardScore
+                    bestBoards = [possibleBoard]
+                elif(boardScore == bestScore):
+                    bestBoards.append(possibleBoard)
+            elif(data.turn == "white"):
+                if(bestScore == None or boardScore < bestScore):
+                    bestScore = boardScore
+                    bestBoards = [possibleBoard]
+                elif(boardScore == bestScore):
+                    bestBoards.append(possibleBoard)
+        select = random.randint(0,len(bestBoards)-1)
+        data.board = bestBoards[select]
+        print("bestScore:", bestScore)
+        if(data.turn == "black"):
+            data.turn = "white"
+        else:
+            data.turn = "black"
 
 def timerFired(data):
     pass
 
 def redrawAll(canvas, data):
-    drawText(canvas, data)
-    drawBoard(canvas, data)
-    drawPieces(canvas, data)
+    drawTitleText(canvas, data)
+    if(data.gameMode == "menu"):
+        drawBoard(canvas, data)
+        drawMenu(canvas,data)
+    elif(data.gameMode == "AI_game"):
+        drawBoard(canvas, data)
+        drawPieces(canvas, data)
+        drawAIGameText(canvas, data)
     pass
-def drawText(canvas,data):
+def drawTitleText(canvas,data):
     canvas.create_text(data.width//2,data.textHeight,text = "AlphaAbalone")
+def drawMenu(canvas,data):
+    canvas.create_text(data.width//2,data.textHeight*3//2,text = "Press p to start a game between 2 AIs")
+def drawAIGameText(canvas,data):
+    canvas.create_text(data.width//2,data.textHeight*3//2,text = "Press m to calculate the next move")
 def drawBoard(canvas, data):
     cx = data.width//2
     cy = data.height//2
@@ -201,15 +228,68 @@ def drawPieces(canvas,data):
             elif(data.board[i][j] == "black"):
                 canvas.create_oval(pieceX-data.spotRadius,pieceY-data.spotRadius,
                 pieceX+data.pieceRadius,pieceY+data.pieceRadius, fill = "black")
-            canvas.create_text(pieceX,pieceY,text = str(data.board3AxisCoords[i][j]),fill= "green")
+            #canvas.create_text(pieceX,pieceY,text = str(data.board3AxisCoords[i][j]),fill= "green")
     pass
 ####
-#Controls
+#Human Controls
 ####
 
 ####
 #AI
 ####
+def minimax(data,depth):
+    #This function returns the board chosen as a result of the minimax algorithm
+    currColor = data.turn
+    possibleBoards = possibleMoves(data.board,currColor,data)
+    nextColor = getOpposingColor(currColor)
+    bestBoard = None
+    bestScore = None
+    for possibleBoard in possibleBoards:
+         boardScore = minimaxRecursive(data,possibleBoard,nextColor,depth-1)
+         if(data.turn == "black"):
+            if(bestScore == None or boardScore > bestScore):
+                bestScore = boardScore
+                bestBoard = possibleBoard
+         elif(data.turn == "white"):
+            if(bestScore == None or boardScore < bestScore):
+                bestScore = boardScore
+                bestBoard = possibleBoard
+    return bestBoard
+
+def minimaxRecursive(data, board, currColor, depth):
+    print("minimaxRecusive depth = ", depth)
+    possibleBoards = possibleMoves(board,currColor,data)
+    print("moves to check: ", len(possibleBoards))
+    if(depth <= 1): #Base Case
+        bestBoard = None
+        bestScore = None
+        for possibleBoard in possibleBoards:
+            boardScore = boardEvaluator(possibleBoard,data)
+            if(currColor == "black"):
+                if(bestScore == None or boardScore > bestScore):
+                    bestScore = boardScore
+                    bestBoard = possibleBoard
+            elif(currColor == "white"):
+                if(bestScore == None or boardScore < bestScore):
+                    bestScore = boardScore
+                    bestBoard = possibleBoard
+        return bestScore
+    else: #recursive case
+        nextColor = getOpposingColor(currColor)
+        bestBoard = None
+        bestScore = None
+        for possibleBoard in possibleBoards:
+            boardScore = minimaxRecursive(data,possibleBoard,nextColor,depth-1)
+            if(currColor == "black"):
+                if(bestScore == None or boardScore > bestScore):
+                    bestScore = boardScore
+                    bestBoard = possibleBoard
+            elif(currColor == "white"):
+                if(bestScore == None or boardScore < bestScore):
+                    bestScore = boardScore
+                    bestBoard = possibleBoard
+        return bestScore
+
 def possibleChains(board,currColor,data):
     #Returns a list of sets of tuples, where each set is a chain of pieces
     chains = []
@@ -282,7 +362,7 @@ def possibleMoveForChainInDirection(board,currColor,data,chain,direction):
         if(getColorAtCoords(board,newPiece,data) != None):
             broadsideMovePossible = False
     if(broadsideMovePossible):
-        print("Make Broadside Move")
+        #print("Make Broadside Move")
         return makeMove(board,currColor,data,chain,newChain)
     #Now check for a possible inline move or inline push
     if(isInline(newChain,direction) == False):
@@ -302,10 +382,10 @@ def possibleMoveForChainInDirection(board,currColor,data,chain,direction):
             else: #Opposite color
                 opposingChainStart = newPiece
     if(inlineMovePossible):
-        print("Make Inline Move")
+        #print("Make Inline Move")
         return makeMove(board,currColor,data,chain,newChain)
     elif(pushMovePossible):
-        print("Make Inline Push Move")
+        #print("Make Inline Push Move")
         return makePushMove(board,currColor,data,chain,newChain,direction,opposingChainStart)
     
 def makeMove(board,currColor,data,chain,newChain):
@@ -319,7 +399,7 @@ def makeMove(board,currColor,data,chain,newChain):
     return newBoard
 def makePushMove(board,currColor,data,chain,newChain,direction,opposingChainStart):
     #Get the length of the current chain:
-    print("New chain: ", newChain)
+    #print("New chain: ", newChain)
     currChainLength = len(newChain)
     #Now, figure out the length of the opposing chain.
     opposingColor = getOpposingColor(currColor)
@@ -332,8 +412,8 @@ def makePushMove(board,currColor,data,chain,newChain,direction,opposingChainStar
         (dx,dy,dz) = direction
         currPiece = (x+dx,y+dy,z+dz)
         opposingChainLength += 1
-    print("currChainLength: ", currChainLength)
-    print("opposingChainLength: ", opposingChainLength)
+    #print("currChainLength: ", currChainLength)
+    #print("opposingChainLength: ", opposingChainLength)
     if(currChainLength > opposingChainLength):
         #first move the opposing chain:
         newOpposingChain = copy.deepcopy(opposingChain)
