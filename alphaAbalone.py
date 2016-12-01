@@ -18,9 +18,17 @@ def init(data):
     data.textHeight = 30
     data.gameMode = "menu"
     data.turn = "white"
+
+    data.selectedPieces = {}
+    data.lastHex = None
+
     createBoardLists(data)
     setUpBoard(data)
     assign3AxisCoords(data)
+
+    #Make coord 3-axis to 2-axis conversion lookup
+    data.convertCoords = dict()
+    createConvertCoords(data)
     createPieceLists(data)
     
     print(getColorAtCoords(data.board,(3,-2,-1),data))
@@ -72,18 +80,21 @@ def createPieceLists(data):
                 data.whitePieceList.append(piece(row,col,"white",data))
             elif(data.board[row][col] == "black"):
                 data.blackPieceList.append(piece(row,col,"black",data))
+def createConvertCoords(data): 
+    #makes a lookup table for fast conversions from 3-axis to 2-axis coordinates
+    for row in range(len(data.board3AxisCoords)):
+        for col in range(len(data.board3AxisCoords[row])):
+            curr3Axis = data.board3AxisCoords[row][col]
+            data.convertCoords[curr3Axis] = (row,col)
 def getColorAtCoords(board,coords,data):
-    for row in range(len(board)):
-        for col in range(len(board[row])):
-            if(data.board3AxisCoords[row][col] == coords):
-                return board[row][col]
+    if(coords in data.convertCoords.keys()):
+        (row,col) = data.convertCoords[coords]
+        return board[row][col]
     return False
 def setColorAtCoords(color,board,coords,data):
-    #print("Setting ", color, " at ", coords)
-    for row in range(len(board)):
-        for col in range(len(board[row])):
-            if(data.board3AxisCoords[row][col] == coords):
-                board[row][col] = color
+    if(coords in data.convertCoords.keys()):
+        (row,col) = data.convertCoords[coords]
+        board[row][col] = color
 class piece(object):
     def __init__(self,row,col,color,data):
         self.row = row
@@ -99,7 +110,6 @@ class piece(object):
             (dx,dy,dz) = direction
             (x,y,z) = self.coord
             chains.append(self.coords)
-            
             newChains = possibleChainsRecursive(direction,newCoord)
             if(newChains != None):
                 chains.extend(newChains)
@@ -131,10 +141,15 @@ def assign3AxisCoords(data):
             currY = -currY
             currZ = -1*(currX + currY)
             data.board3AxisCoords[row][col] = (currX, currY,currZ)
-
 def mousePressed(event, data):
-    pass
-
+    #Selector for making human moves
+    for row in range(len(data.boardScreenPos)):
+        for col in range(len(data.boardScreenPos[row])):
+            (x,y) = data.boardScreenPos[row][col]
+            dist = math.sqrt((event.x-x)**2+(event.y-y)**2)
+            if(dist < 25):
+                print("clicked on" , row, col)
+                humanControl(row,col,data)
 def keyPressed(event, data):
     if(data.gameMode == "menu"):
         if(event.keysym == 'p'):
@@ -233,7 +248,72 @@ def drawPieces(canvas,data):
 ####
 #Human Controls
 ####
+def hexDiff(hex1,hex2): #returns the direction and distance between hexes
+    (x1,y1,z1) = hex1
+    (x2,y2,z2) = hex2
+    dist = max(abs(x2-x1),abs(y2-y1),abs(z2-z1))
+    direction = ((x2-x1)//dist,(y2-y1)//dist,(z2-z1)//dist)
+    return (direction,dist)
+def humanControl(rowClicked,colClicked,data):
+    if(len(data.selectedPieces) == 0):
+        if(data.board[rowClicked][colClicked] == data.turn):
+            data.selectedPieces = {data.board3AxisCoords[rowClicked][colClicked]}
+    elif(len(data.selectedPieces) == 1):
+        #This function handles the second click
+        humanControlSecondClick(rowClicked,colClicked,data)
+    else:
+        #If we have a chain selected
+        humanControlThirdClick(rowClicked,colClicked,data)
+    print("SelectedPieces: ",data.selectedPieces)
+def humanControlSecondClick(rowClicked,colClicked,data):
+    currHex = list(data.selectedPieces)[0]
+    newHex = data.board3AxisCoords[rowClicked][colClicked]
+    data.lastHex = newHex
+    (direction,dist) = hexDiff(currHex,newHex)
+    #Case 1, click to a blank square
+    if(data.board[rowClicked][colClicked] == None):
+        if(dist == 1): #click was adjacent
+            makeHumanMove(data,direction)
+    #Case 2, click on another piece (form chain)
+    elif(data.board[rowClicked][colClicked] == data.turn):
+        if(newHex == currHex): #double clicks deselect
+            data.selectedPieces = {} 
+        else: #Find the correct chain
+            chains = []
+            (row,col) = data.convertCoords[currHex]
+            possibleChainsForPiece(data.board,
+                data.turn,data,row,col,chains)
+            shortestChain = getShortestChain(chains,newHex)
+            if(shortestChain != None):
+                data.selectedPieces = shortestChain
+def humanControlThirdClick(rowClicked,colClicked,data):
+    newHex = data.board3AxisCoords[rowClicked][colClicked]
+    (direction,dist) = hexDiff(data.lastHex,newHex)
+    makeHumanMove(data,direction)
+    pass
 
+def makeHumanMove(data,direction):
+    newBoard = possibleMoveForChainInDirection(data.board,data.turn,data,
+    data.selectedPieces,direction) 
+    if(newBoard != None):
+        data.board = newBoard
+        data.turn = getOpposingColor(data.turn)
+    data.selectedPieces = {}
+def getShortestChain(possibleChains,newHex):
+    #Gets the shortest chain that contains both the selected hex
+    bestLength = None
+    bestChain = None
+    for possibleChain in possibleChains:
+        #See if it contains the selected hex
+        pieceFound = False
+        for piece in possibleChain:
+            if(piece == newHex):
+                pieceFound = True
+        chainLength = len(possibleChain)
+        if(pieceFound==True and (bestLength==None or chainLength<bestLength)):
+            bestLength = chainLength
+            bestChain = possibleChain
+    return bestChain
 ####
 #AI
 ####
@@ -242,19 +322,24 @@ def minimax(data,depth):
     currColor = data.turn
     possibleBoards = possibleMoves(data.board,currColor,data)
     nextColor = getOpposingColor(currColor)
-    bestBoard = None
+    bestBoards = []
     bestScore = None
     for possibleBoard in possibleBoards:
          boardScore = minimaxRecursive(data,possibleBoard,nextColor,depth-1)
          if(data.turn == "black"):
             if(bestScore == None or boardScore > bestScore):
                 bestScore = boardScore
-                bestBoard = possibleBoard
+                bestBoards = [possibleBoard]
+            elif(boardScore == bestScore):
+                bestBoards.append(possibleBoard)
          elif(data.turn == "white"):
             if(bestScore == None or boardScore < bestScore):
                 bestScore = boardScore
-                bestBoard = possibleBoard
-    return bestBoard
+                bestBoards = [possibleBoard]
+            elif(boardScore == bestScore):
+                bestBoards.append(possibleBoard)
+    select = random.randint(0,len(bestBoards)-1)
+    return bestBoards[select]
 
 def minimaxRecursive(data, board, currColor, depth):
     print("minimaxRecusive depth = ", depth)
@@ -375,9 +460,10 @@ def possibleMoveForChainInDirection(board,currColor,data,chain,direction):
         setColorAtCoords(None,newBoard,oldPiece,data)
     for newPiece in newChain:
         checkSpot = getColorAtCoords(newBoard,newPiece,data)
+        #print("checkspot: ",checkSpot)
         if(checkSpot != None):
             inlineMovePossible = False
-            if(checkSpot == currColor):
+            if(checkSpot == currColor or checkSpot == False):
                 pushMovePossible = False
             else: #Opposite color
                 opposingChainStart = newPiece
@@ -496,7 +582,7 @@ def run(width=300, height=300):
     def redrawAllWrapper(canvas, data):
         canvas.delete(ALL)
         canvas.create_rectangle(0, 0, data.width, data.height,
-                                fill='white', width=0)
+                                fill='light gray', width=0)
         redrawAll(canvas, data)
         canvas.update()    
 
