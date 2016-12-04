@@ -6,17 +6,17 @@ import copy
 ####################################
 # customize these functions
 ####################################
-
-def init(data):
+def generalInit(data):
     testIsInline()
-    data.boardWidth = 550
-    data.hexesPerSide = 5 #A standard abalone board has side length 5 hexes
+    data.hexesPerSide = 5
     data.hexesAcross = 2*data.hexesPerSide-1
     data.hexSize = data.boardWidth//data.hexesAcross
-    data.spotRadius = 23
-    data.pieceRadius = 26
+    data.spotRadius = 23 *data.boardWidth/550
+    data.pieceRadius = 26 *data.boardWidth/550
+    data.selectionRadius = 30 *data.boardWidth/550
     data.textHeight = 30
-    data.gameMode = "menu"
+    initMenuButtons(data)
+
     data.turn = "white"
 
     data.selectedPieces = {}
@@ -29,12 +29,21 @@ def init(data):
     #Make coord 3-axis to 2-axis conversion lookup
     data.convertCoords = dict()
     createConvertCoords(data)
-    createPieceLists(data)
-    
-    print(getColorAtCoords(data.board,(3,-2,-1),data))
+def initMenu(data):
+    data.boardWidth = 360 
+    data.gameMode = "menu"
+    data.buttonOffset = 20 
+    data.buttonWidth = 240
+    data.buttonHeight = 100
+    generalInit(data)
 
-    print("Overall Board Score: ", boardEvaluator(data.board,data))
-    pass
+def initGame(data):
+    data.boardWidth = 550 #550
+    data.buttonOffset = 20 
+    data.buttonWidth = 140
+    data.buttonHeight = 210
+    generalInit(data)
+
 def setUpBoard(data):
     #white - fill first two lines
     linesToFill = 2
@@ -71,15 +80,6 @@ def createBoardLists(data):
         data.board.append(row)
         data.boardScreenPos.append(copy.copy(row))
         data.board3AxisCoords.append(copy.copy(row))
-def createPieceLists(data):
-    data.whitePieceList = []
-    data.blackPieceList = []
-    for row in range(len(data.board)):
-        for col in range(len(data.board[row])):
-            if(data.board[row][col] == "white"):
-                data.whitePieceList.append(piece(row,col,"white",data))
-            elif(data.board[row][col] == "black"):
-                data.blackPieceList.append(piece(row,col,"black",data))
 def createConvertCoords(data): 
     #makes a lookup table for fast conversions from 3-axis to 2-axis coordinates
     for row in range(len(data.board3AxisCoords)):
@@ -95,31 +95,6 @@ def setColorAtCoords(color,board,coords,data):
     if(coords in data.convertCoords.keys()):
         (row,col) = data.convertCoords[coords]
         board[row][col] = color
-class piece(object):
-    def __init__(self,row,col,color,data):
-        self.row = row
-        self.col = col
-        self.color = color
-        self.coord = data.board3AxisCoords[row][col]
-    def possibleChains(self):
-        dirs = [(-1,+1, 0),(0,+1,-1),
-            (-1, 0,+1),        (+1,0,-1),
-                ( 0,-1,+1),(+1,-1, 0)]
-        chains = []
-        for direction in dirs:
-            (dx,dy,dz) = direction
-            (x,y,z) = self.coord
-            chains.append(self.coords)
-            newChains = possibleChainsRecursive(direction,newCoord)
-            if(newChains != None):
-                chains.extend(newChains)
-    def possibleChainsRecursive(direction,coord):
-        if(data.boardDict[newCoord] == self.color):
-            (dx,dy,dz) = direction
-            newCoord = (x+dx,y+dy,+z+dz)
-            result = coord + possibleChainsRecursive(direction,newCoord)
-        else:
-            return None
 def assign3AxisCoords(data):
     #Step 1, fill up 3-axis coords with initial values
     for row in range(len(data.board)):
@@ -142,17 +117,21 @@ def assign3AxisCoords(data):
             currZ = -1*(currX + currY)
             data.board3AxisCoords[row][col] = (currX, currY,currZ)
 def mousePressed(event, data):
-    #Selector for making human moves
-    for row in range(len(data.boardScreenPos)):
-        for col in range(len(data.boardScreenPos[row])):
-            (x,y) = data.boardScreenPos[row][col]
-            dist = math.sqrt((event.x-x)**2+(event.y-y)**2)
-            if(dist < 25):
-                print("clicked on" , row, col)
-                humanControl(row,col,data)
+    if(data.gameMode == "AI_game" or data.gameMode == "human_game"):
+        #Selector for making human moves
+        for row in range(len(data.boardScreenPos)):
+            for col in range(len(data.boardScreenPos[row])):
+                if(data.boardScreenPos[row][col] == None):
+                    return
+                (x,y) = data.boardScreenPos[row][col]
+                dist = math.sqrt((event.x-x)**2+(event.y-y)**2)
+                if(dist < 25):
+                    print("clicked on" , row, col)
+                    humanControl(row,col,data)
 def keyPressed(event, data):
     if(data.gameMode == "menu"):
         if(event.keysym == 'p'):
+            initGame(data)
             data.gameMode = "AI_game"
     elif(data.gameMode == "AI_game"):
         keyPressedAIGame(event,data)
@@ -165,62 +144,96 @@ def keyPressedAIGame(event,data):
             data.turn = "white"
         else:
             data.turn = "black"
-    elif(event.keysym == "m"):
-        possibleBoards = possibleMoves(data.board,data.turn,data)
-        bestScore = None
-        bestBoards = []
-        print(len(possibleBoards), " moves evaluated")
-        for possibleBoard in possibleBoards:
-            #print("Possible Board: ", possibleBoard)
-            boardScore = boardEvaluator(possibleBoard,data)
-            if(data.turn == "black"):
-                if(bestScore == None or boardScore > bestScore):
-                    bestScore = boardScore
-                    bestBoards = [possibleBoard]
-                elif(boardScore == bestScore):
-                    bestBoards.append(possibleBoard)
-            elif(data.turn == "white"):
-                if(bestScore == None or boardScore < bestScore):
-                    bestScore = boardScore
-                    bestBoards = [possibleBoard]
-                elif(boardScore == bestScore):
-                    bestBoards.append(possibleBoard)
-        select = random.randint(0,len(bestBoards)-1)
-        data.board = bestBoards[select]
-        print("bestScore:", bestScore)
-        if(data.turn == "black"):
-            data.turn = "white"
-        else:
-            data.turn = "black"
-
+def humanGameButtonPressed(event,data):
+    initGame(data)
+    data.gameMode = "human_game"
+def AIGameButtonPressed(event,data):
+    initGame(data)
+    data.gameMode = "AI_game"
 def timerFired(data):
     pass
 
 def redrawAll(canvas, data):
     drawTitleText(canvas, data)
     if(data.gameMode == "menu"):
-        drawBoard(canvas, data)
-        drawMenu(canvas,data)
-    elif(data.gameMode == "AI_game"):
+        drawDescription(canvas,data)
+        drawBoard(canvas, data, data.width//2, data.height//2)
+        drawMenuButtons(canvas, data)
+        drawButtonText(canvas,data)
+        drawPieces(canvas, data)
+    elif(data.gameMode == "AI_game" or data.gameMode == "human_game"):
         drawBoard(canvas, data)
         drawPieces(canvas, data)
+        drawMenuButtons(canvas, data)
         drawAIGameText(canvas, data)
     pass
 def drawTitleText(canvas,data):
-    canvas.create_text(data.width//2,data.textHeight,text = "AlphaAbalone")
-def drawMenu(canvas,data):
-    canvas.create_text(data.width//2,data.textHeight*3//2,text = "Press p to start a game between 2 AIs")
+    canvas.create_text(data.width//2,data.textHeight,text = "AlphaAbalone",
+    font = "System 36")
+def drawDescription(canvas,data):
+    canvas.create_text(data.width//2,data.textHeight*2.5,
+        text = "Abalone Board game with AI", font = "System 12")
+def drawButtonText(canvas,data):
+    textShift = 5
+    canvas.create_text(data.leftX+textShift,data.topY, anchor = "nw",
+        text = "Play Against a Human", font = "Ariel 20")
+    canvas.create_text(data.leftX+textShift,data.innerBottomY, anchor = "nw",
+        text = "Play Against an AI", font = "Ariel 20")
+    pass
+
+def initMenuButtons(data):
+    #Variables for positioning the buttons
+    data.leftX=data.width//2-data.boardWidth//2-data.buttonOffset
+    data.leftX -= data.buttonWidth
+    data.rightX=data.width//2+data.boardWidth//2+data.buttonOffset
+    data.rightX += data.buttonWidth
+    data.innerLeftX = data.width//2-data.boardWidth//2-data.buttonOffset
+    data.innerRightX =  data.width//2+data.boardWidth//2+data.buttonOffset 
+    data.topY = data.height//2-data.buttonOffset-data.buttonHeight
+    data.innerTopY = data.height//2-data.buttonOffset
+    data.bottomY = data.height//2+data.buttonOffset+data.buttonHeight
+    data.innerBottomY = data.height//2+data.buttonOffset
+def drawMenuButtons(canvas,data):
+    tan30 = math.tan(math.pi/6)
+    button1 = canvas.create_polygon((data.innerLeftX, data.innerTopY),
+        (data.leftX,data.innerTopY),(data.leftX,data.topY),
+        (data.innerLeftX+data.buttonHeight*tan30,data.topY),
+        fill = "gray")
+    button2 = canvas.create_polygon((data.innerLeftX, data.innerBottomY), 
+        (data.leftX,data.innerBottomY),(data.leftX,data.bottomY),
+        (data.innerLeftX+data.buttonHeight*tan30,data.bottomY),
+        fill = "gray")
+    button3 = canvas.create_polygon((data.innerRightX, data.innerTopY), 
+        (data.rightX,data.innerTopY),(data.rightX,data.topY),
+        (data.innerRightX-data.buttonHeight*tan30,data.topY),
+        fill = "gray")
+    button4 = canvas.create_polygon((data.innerRightX, data.innerBottomY), 
+        (data.rightX,data.innerBottomY),(data.rightX,data.bottomY),
+        (data.innerRightX-data.buttonHeight*tan30,data.bottomY),
+        fill = "gray")
+    canvas.tag_bind(button1, '<ButtonPress-1>',
+    lambda event:humanGameButtonPressed(event, data))  
+    canvas.tag_bind(button2, '<ButtonPress-1>', 
+    lambda event:AIGameButtonPressed(event, data)) 
+    canvas.tag_bind(button3, '<ButtonPress-1>', 
+    lambda event:AIGameButtonPressed(event, data)) 
+    canvas.tag_bind(button3, '<ButtonPress-1>',
+    lambda event:AIGameButtonPressed(event, data)) 
+    pass
+
 def drawAIGameText(canvas,data):
-    canvas.create_text(data.width//2,data.textHeight*3//2,text = "Press m to calculate the next move")
-def drawBoard(canvas, data):
-    cx = data.width//2
-    cy = data.height//2
+    pass
+def drawBoard(canvas, data, cx=None,cy =None):
+    if(cx == None):
+        cx = data.width//2
+    if(cy == None):
+        cy = data.height//2
     r = data.boardWidth//2
     cos60 = math.cos(math.pi/3)
     sin60 = math.sin(math.pi/3)  
     #Draw hexagonal board 
-    canvas.create_polygon(cx-r,cy,cx-r*cos60,cy-r*sin60,cx+r*cos60,cy-r*sin60,cx+r,cy,
-        cx+r*cos60,cy+r*sin60,cx-r*cos60,cy+r*sin60,fill = "sienna")
+    canvas.create_polygon(cx-r,cy,cx-r*cos60,cy-r*sin60,cx+r*cos60,cy-r*sin60,
+        cx+r,cy,cx+r*cos60,cy+r*sin60,cx-r*cos60,cy+r*sin60,fill = "sienna")
     for i in range(data.hexesAcross):
         spotY = (cy-r*sin60) + i*data.hexSize*sin60 + data.hexSize*sin60/2
         rowLength = getRowLength(i,data)
@@ -233,18 +246,28 @@ def drawBoard(canvas, data):
             if(data.boardScreenPos[i][j] == None):
                 data.boardScreenPos[i][j] = (spotX,spotY)
 def drawPieces(canvas,data):
-    for i in range(data.hexesAcross):
-        rowLength = getRowLength(i,data)
-        for j in range(rowLength):
-            (pieceX,pieceY) = data.boardScreenPos[i][j]
-            if(data.board[i][j] == "white"):
-                canvas.create_oval(pieceX-data.pieceRadius,pieceY-data.pieceRadius,
-                pieceX+data.pieceRadius,pieceY+data.pieceRadius, fill = "white")
-            elif(data.board[i][j] == "black"):
-                canvas.create_oval(pieceX-data.spotRadius,pieceY-data.spotRadius,
-                pieceX+data.pieceRadius,pieceY+data.pieceRadius, fill = "black")
-            #canvas.create_text(pieceX,pieceY,text = str(data.board3AxisCoords[i][j]),fill= "green")
-    pass
+    for row in range(data.hexesAcross):
+        rowLength = getRowLength(row,data)
+        for col in range(rowLength):
+            (pieceX,pieceY) = data.boardScreenPos[row][col]
+            #Highlight selected pieces:
+            currHex = data.board3AxisCoords[row][col]
+            for selected in data.selectedPieces:
+                if(selected == currHex):
+                    canvas.create_oval(pieceX-data.selectionRadius,
+                    pieceY-data.selectionRadius, pieceX+data.selectionRadius,
+                    pieceY+data.selectionRadius, fill = "chartreuse")
+            #Draw pieces
+            if(data.board[row][col] == "white"):
+                canvas.create_oval(pieceX-data.pieceRadius,
+                pieceY-data.pieceRadius,pieceX+data.pieceRadius,
+                pieceY+data.pieceRadius, fill = "white")
+            elif(data.board[row][col] == "black"):
+                canvas.create_oval(pieceX-data.pieceRadius,
+                pieceY-data.pieceRadius,pieceX+data.pieceRadius,
+                pieceY+data.pieceRadius, fill = "black")
+            #canvas.create_text(pieceX,pieceY,
+            #text = str(data.board3AxisCoords[i][j]),fill= "green")
 ####
 #Human Controls
 ####
@@ -255,23 +278,25 @@ def hexDiff(hex1,hex2): #returns the direction and distance between hexes
     direction = ((x2-x1)//dist,(y2-y1)//dist,(z2-z1)//dist)
     return (direction,dist)
 def humanControl(rowClicked,colClicked,data):
+    #This function allows human mouse input to select pieces
     if(len(data.selectedPieces) == 0):
         if(data.board[rowClicked][colClicked] == data.turn):
-            data.selectedPieces = {data.board3AxisCoords[rowClicked][colClicked]}
+            data.selectedPieces={data.board3AxisCoords[rowClicked][colClicked]}
     elif(len(data.selectedPieces) == 1):
         #This function handles the second click
         humanControlSecondClick(rowClicked,colClicked,data)
     else:
-        #If we have a chain selected
+        #If we have a chain selected (third click)
         humanControlThirdClick(rowClicked,colClicked,data)
     print("SelectedPieces: ",data.selectedPieces)
 def humanControlSecondClick(rowClicked,colClicked,data):
     currHex = list(data.selectedPieces)[0]
     newHex = data.board3AxisCoords[rowClicked][colClicked]
     data.lastHex = newHex
-    (direction,dist) = hexDiff(currHex,newHex)
+    
     #Case 1, click to a blank square
     if(data.board[rowClicked][colClicked] == None):
+        (direction,dist) = hexDiff(currHex,newHex)
         if(dist == 1): #click was adjacent
             makeHumanMove(data,direction)
     #Case 2, click on another piece (form chain)
@@ -288,9 +313,11 @@ def humanControlSecondClick(rowClicked,colClicked,data):
                 data.selectedPieces = shortestChain
 def humanControlThirdClick(rowClicked,colClicked,data):
     newHex = data.board3AxisCoords[rowClicked][colClicked]
-    (direction,dist) = hexDiff(data.lastHex,newHex)
-    makeHumanMove(data,direction)
-    pass
+    if(newHex == data.lastHex):
+        data.selectedPieces = {}
+    else:
+        (direction,dist) = hexDiff(data.lastHex,newHex)
+        makeHumanMove(data,direction)
 
 def makeHumanMove(data,direction):
     newBoard = possibleMoveForChainInDirection(data.board,data.turn,data,
@@ -400,6 +427,7 @@ def possibleChainsForPiece(board,currColor,data,row,col,chains):
             (x,y,z) = chainCoords[-1]
             chainCoords.append((x+dx,y+dy,z+dz))
 def noRepeats(currChain, chains):
+    #Removes copies of the same chain
     for chain in chains:
         if(currChain == chain):
             return False
@@ -432,11 +460,12 @@ def isInline(chain,direction):
         (x2,y2,z2) = chain[i+1]
         maxFactor = max(abs(x1-x2),abs(y1-y2),abs(z1-z2))
         chainDiff = ((x1-x2)//maxFactor,(y1-y2)//maxFactor,(z1-z2)//maxFactor)
-        chainDiffReverse = ((x2-x1)//maxFactor,(y2-y1)//maxFactor,(z2-z1)//maxFactor)
-        if(chainDiff != direction and chainDiffReverse != direction): 
+        chainDiffRev=((x2-x1)//maxFactor,(y2-y1)//maxFactor,(z2-z1)//maxFactor)
+        if(chainDiff != direction and chainDiffRev != direction): 
             return False
     return True
 def possibleMoveForChainInDirection(board,currColor,data,chain,direction):
+    #Checks if it is possible for a given chain to move in a given direction
     newChain = list(copy.deepcopy(chain))
     (dx,dy,dz) = direction
     broadsideMovePossible = True
@@ -472,7 +501,8 @@ def possibleMoveForChainInDirection(board,currColor,data,chain,direction):
         return makeMove(board,currColor,data,chain,newChain)
     elif(pushMovePossible):
         #print("Make Inline Push Move")
-        return makePushMove(board,currColor,data,chain,newChain,direction,opposingChainStart)
+        return makePushMove(board,currColor,data,chain,newChain,
+        direction,opposingChainStart)
     
 def makeMove(board,currColor,data,chain,newChain):
     #All pieces can be moved to an empty square, then the move is valid
@@ -483,7 +513,8 @@ def makeMove(board,currColor,data,chain,newChain):
     for newPiece in newChain:
         setColorAtCoords(currColor,newBoard,newPiece,data)
     return newBoard
-def makePushMove(board,currColor,data,chain,newChain,direction,opposingChainStart):
+def makePushMove(board,currColor,data,chain,newChain,direction,
+opposingChainStart):
     #Get the length of the current chain:
     #print("New chain: ", newChain)
     currChainLength = len(newChain)
@@ -509,7 +540,8 @@ def makePushMove(board,currColor,data,chain,newChain,direction,opposingChainStar
             newOpposingChain[i] = newPiece
             if(getColorAtCoords(board,newPiece,data) == currColor):
                 return None
-        newBoard = makeMove(board,opposingColor,data,opposingChain,newOpposingChain)
+        newBoard = makeMove(board,opposingColor,data,
+        opposingChain,newOpposingChain)
         return makeMove(newBoard,currColor,data,chain,newChain)
 def getOpposingColor(currColor):
     if(currColor == "white"):
@@ -532,7 +564,8 @@ def getAdjacents(board,color,row,col,data):
     return adjacents
 def boardEvaluator(board, data):
     #Uses heuristics to score a current board based on who is winning.
-    #High positive numbers indicate a black is winning, high negatives indicate white is.
+    #High positive numbers indicate a black is winning, 
+    #high negatives indicate white is winning.
     boardScore = 0
     boardScore += 10*evaluatePieceDifference(board, data)
     boardScore += evaluateControlOfCenter(board, data)
@@ -593,7 +626,6 @@ def run(width=300, height=300):
     def keyPressedWrapper(event, canvas, data):
         keyPressed(event, data)
         redrawAllWrapper(canvas, data)
-
     def timerFiredWrapper(canvas, data):
         timerFired(data)
         redrawAllWrapper(canvas, data)
@@ -604,8 +636,8 @@ def run(width=300, height=300):
     data = Struct()
     data.width = width
     data.height = height
-    data.timerDelay = 100 # milliseconds
-    init(data)
+    data.timerDelay = 1000 # milliseconds
+    initMenu(data)
     # create the root and the canvas
     root = Tk()
     canvas = Canvas(root, width=data.width, height=data.height)
