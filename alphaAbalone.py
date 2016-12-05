@@ -7,7 +7,6 @@ import copy
 # customize these functions
 ####################################
 def generalInit(data):
-    testIsInline()
     data.hexesPerSide = 5
     data.hexesAcross = 2*data.hexesPerSide-1
     data.hexSize = data.boardWidth//data.hexesAcross
@@ -15,10 +14,11 @@ def generalInit(data):
     data.pieceRadius = 26 *data.boardWidth/550
     data.selectionRadius = 30 *data.boardWidth/550
     data.textHeight = 30
+    data.turnCount = 0
     initMenuButtons(data)
 
     data.turn = "white"
-
+    data.gameOver = False
     data.selectedPieces = {}
     data.lastHex = None
 
@@ -117,8 +117,13 @@ def assign3AxisCoords(data):
             currZ = -1*(currX + currY)
             data.board3AxisCoords[row][col] = (currX, currY,currZ)
 def mousePressed(event, data):
-    if(data.gameMode == "AI_game" or data.gameMode == "human_game"):
-        #Selector for making human moves
+    if(data.gameMode == "human_game" and data.gameOver == False):
+        getMouseInput(event,data)
+    elif(data.gameMode == "AI_game" and data.turn == "black"
+        and data.gameOver == False):
+        getMouseInput(event,data)
+def getMouseInput(event,data):
+    #Selector for making human moves
         for row in range(len(data.boardScreenPos)):
             for col in range(len(data.boardScreenPos[row])):
                 if(data.boardScreenPos[row][col] == None):
@@ -129,56 +134,121 @@ def mousePressed(event, data):
                     print("clicked on" , row, col)
                     humanControl(row,col,data)
 def keyPressed(event, data):
-    if(data.gameMode == "menu"):
-        if(event.keysym == 'p'):
-            initGame(data)
-            data.gameMode = "AI_game"
-    elif(data.gameMode == "AI_game"):
-        keyPressedAIGame(event,data)
-def keyPressedAIGame(event,data):
-    if(event.keysym == "t"):
-        #run minimax
-        data.board = minimax(data,2)
-        print("move made!")
-        if(data.turn == "black"):
-            data.turn = "white"
-        else:
-            data.turn = "black"
+    if(event.keysym =='r' and data.gameOver == True):
+        data.gameMode == "menu"
+        initMenu(data)
+
+def makeAIMove(data):
+    data.board = minimax(data,2)
+    print("move made!")
+    if(data.turn == "black"):
+        data.turn = "white"
+    else:
+        data.turn = "black"
+    if(checkLoss(data,data.turn) == True):
+        data.gameOver = True
+    data.turnCount += 1
+        
 def humanGameButtonPressed(event,data):
     initGame(data)
     data.gameMode = "human_game"
 def AIGameButtonPressed(event,data):
     initGame(data)
     data.gameMode = "AI_game"
+def howToPlayButtonPressed(event,data):
+    initGame(data)
+    data.gameMode = "how_to_play"
+def learnAIButtonPressed(event,data):
+    initGame(data)
+    data.gameMode = "learn_AI"
 def timerFired(data):
-    pass
+    if(data.gameMode == "AI_game" and data.turn == "white"
+    and data.gameOver == False):
+        makeAIMove(data)
 
 def redrawAll(canvas, data):
-    drawTitleText(canvas, data)
     if(data.gameMode == "menu"):
+        drawTitleText(canvas, data)
         drawDescription(canvas,data)
         drawBoard(canvas, data, data.width//2, data.height//2)
-        drawMenuButtons(canvas, data)
+        drawMenuButtons(canvas, data, enableButtons = True)
         drawButtonText(canvas,data)
         drawPieces(canvas, data)
-    elif(data.gameMode == "AI_game" or data.gameMode == "human_game"):
+    elif(data.gameMode == "AI_game" ):
         drawBoard(canvas, data)
         drawPieces(canvas, data)
         drawMenuButtons(canvas, data)
-        drawAIGameText(canvas, data)
-    pass
+        drawAIGameText(canvas,data)
+        if(data.gameOver == True):
+            drawGameOverText(canvas, data)
+    elif(data.gameMode == "human_game"):
+        drawBoard(canvas, data)
+        drawPieces(canvas, data)
+        drawMenuButtons(canvas, data)
+        drawHumanGameText(canvas,data)
+        if(data.gameOver == True):
+            drawGameOverText(canvas, data)
+    elif(data.gameMode == "how_to_play"):
+        drawTitleText(canvas, data)
+    elif(data.gameMode == "learn_AI"):
+        drawTitleText(canvas, data)
+
 def drawTitleText(canvas,data):
     canvas.create_text(data.width//2,data.textHeight,text = "AlphaAbalone",
     font = "System 36")
 def drawDescription(canvas,data):
-    canvas.create_text(data.width//2,data.textHeight*2.5,
+    heightFactor = 2.5
+    canvas.create_text(data.width//2,data.textHeight*heightFactor,
         text = "Abalone Board game with AI", font = "System 12")
+    canvas.create_text(data.width//2,data.textHeight*(heightFactor+1),
+        text = "Using Minimax Algorithm with Alpha-Beta Prunning", font = "System 12")
+    canvas.create_text(data.width//2,data.height-data.textHeight*(heightFactor+1),
+        text = "A 15-112 Term Project By Ben Soudry", font = "System 12")
+def drawGameOverText(canvas, data):
+    heightFactor = 1.5
+    canvas.create_text(data.width//2,data.textHeight*heightFactor,
+        text = "Game Over! Press r to return to menu", font = "System 12")
 def drawButtonText(canvas,data):
     textShift = 5
     canvas.create_text(data.leftX+textShift,data.topY, anchor = "nw",
         text = "Play Against a Human", font = "Ariel 20")
     canvas.create_text(data.leftX+textShift,data.innerBottomY, anchor = "nw",
         text = "Play Against an AI", font = "Ariel 20")
+    canvas.create_text(data.innerRightX,data.topY, anchor = "nw",
+        text = "How to Play", font = "Ariel 20")
+    canvas.create_text(data.innerRightX,data.innerBottomY, anchor = "nw",
+        text = "Learn about the AI", font = "Ariel 20")
+    pass
+def drawAIGameText(canvas,data):
+    textShift = 5
+    statusTextHeight = 45
+    canvas.create_text(data.leftX+textShift,data.topY, anchor = "nw",
+        text = "AlphaAbalone", font = "System 28")
+    canvas.create_text(data.leftX+textShift,data.innerBottomY, anchor = "nw",
+        text = "Human", font = "Ariel 28")
+    if(data.turn == "black"):
+        canvas.create_text(data.leftX+textShift,
+        data.innerBottomY+statusTextHeight, anchor = "nw",
+        text = "Your Move", font = "Ariel 20")
+    elif(data.turn == "white"):
+        canvas.create_text(data.leftX+textShift,
+        data.topY+statusTextHeight, anchor = "nw",
+        text = "Thinking...", font = "System 20")
+def drawHumanGameText(canvas,data):
+    textShift = 5
+    statusTextHeight = 45
+    canvas.create_text(data.leftX+textShift,data.topY, anchor = "nw",
+        text = "Player1", font = "Ariel 28")
+    canvas.create_text(data.leftX+textShift,data.innerBottomY, anchor = "nw",
+        text = "Player2", font = "Ariel 28")
+    if(data.turn == "white"):
+        canvas.create_text(data.leftX+textShift,
+        data.topY+statusTextHeight, anchor = "nw",
+        text = "Your Move", font = "Ariel 20")
+    elif(data.turn == "black"):
+        canvas.create_text(data.leftX+textShift,
+        data.innerBottomY+statusTextHeight, anchor = "nw",
+        text = "Your Move", font = "Ariel 20")
     pass
 
 def initMenuButtons(data):
@@ -193,7 +263,7 @@ def initMenuButtons(data):
     data.innerTopY = data.height//2-data.buttonOffset
     data.bottomY = data.height//2+data.buttonOffset+data.buttonHeight
     data.innerBottomY = data.height//2+data.buttonOffset
-def drawMenuButtons(canvas,data):
+def drawMenuButtons(canvas,data, enableButtons = False):
     tan30 = math.tan(math.pi/6)
     button1 = canvas.create_polygon((data.innerLeftX, data.innerTopY),
         (data.leftX,data.innerTopY),(data.leftX,data.topY),
@@ -211,18 +281,17 @@ def drawMenuButtons(canvas,data):
         (data.rightX,data.innerBottomY),(data.rightX,data.bottomY),
         (data.innerRightX-data.buttonHeight*tan30,data.bottomY),
         fill = "gray")
-    canvas.tag_bind(button1, '<ButtonPress-1>',
-    lambda event:humanGameButtonPressed(event, data))  
-    canvas.tag_bind(button2, '<ButtonPress-1>', 
-    lambda event:AIGameButtonPressed(event, data)) 
-    canvas.tag_bind(button3, '<ButtonPress-1>', 
-    lambda event:AIGameButtonPressed(event, data)) 
-    canvas.tag_bind(button3, '<ButtonPress-1>',
-    lambda event:AIGameButtonPressed(event, data)) 
+    if(enableButtons == True):
+        canvas.tag_bind(button1, '<ButtonPress-1>',
+        lambda event:humanGameButtonPressed(event, data))  
+        canvas.tag_bind(button2, '<ButtonPress-1>', 
+        lambda event:AIGameButtonPressed(event, data)) 
+        canvas.tag_bind(button3, '<ButtonPress-1>', 
+        lambda event:howToPlayButtonPressed(event, data)) 
+        canvas.tag_bind(button4, '<ButtonPress-1>',
+        lambda event:learnAIButtonPressed(event, data)) 
     pass
 
-def drawAIGameText(canvas,data):
-    pass
 def drawBoard(canvas, data, cx=None,cy =None):
     if(cx == None):
         cx = data.width//2
@@ -318,14 +387,17 @@ def humanControlThirdClick(rowClicked,colClicked,data):
     else:
         (direction,dist) = hexDiff(data.lastHex,newHex)
         makeHumanMove(data,direction)
-
 def makeHumanMove(data,direction):
     newBoard = possibleMoveForChainInDirection(data.board,data.turn,data,
     data.selectedPieces,direction) 
     if(newBoard != None):
         data.board = newBoard
         data.turn = getOpposingColor(data.turn)
+        if(checkLoss(data,data.turn) == True):
+            data.gameOver = True
     data.selectedPieces = {}
+    data.turnCount += 1
+
 def getShortestChain(possibleChains,newHex):
     #Gets the shortest chain that contains both the selected hex
     bestLength = None
@@ -341,37 +413,57 @@ def getShortestChain(possibleChains,newHex):
             bestLength = chainLength
             bestChain = possibleChain
     return bestChain
+
+
+def checkLoss(data,color):
+    return (pieceCount(data,color) <= 8)
+def pieceCount(data,color):
+    pieceCount = 0
+    for row in range(len(data.board)):
+        for col in range(len(data.board[row])):
+            if(data.board[row][col] == color):
+                pieceCount +=1
+
+    print(color, " piece count: ", pieceCount)
+    return pieceCount
 ####
 #AI
 ####
 def minimax(data,depth):
-    #This function returns the board chosen as a result of the minimax algorithm
+    #This function returns the board chosen
+    #as a result of the minimax algorithm with alpha-beta prunning
     currColor = data.turn
     possibleBoards = possibleMoves(data.board,currColor,data)
     nextColor = getOpposingColor(currColor)
     bestBoards = []
     bestScore = None
+    alpha_beta = [None,None]
     for possibleBoard in possibleBoards:
-         boardScore = minimaxRecursive(data,possibleBoard,nextColor,depth-1)
+         boardScore = minimaxRecursive(data,possibleBoard,nextColor,depth-1,
+            alpha_beta)
          if(data.turn == "black"):
             if(bestScore == None or boardScore > bestScore):
                 bestScore = boardScore
                 bestBoards = [possibleBoard]
             elif(boardScore == bestScore):
                 bestBoards.append(possibleBoard)
+            if(alpha_beta[1] == None or bestScore > alpha_beta[1]):
+                alpha_beta[1] = bestScore
          elif(data.turn == "white"):
             if(bestScore == None or boardScore < bestScore):
                 bestScore = boardScore
                 bestBoards = [possibleBoard]
             elif(boardScore == bestScore):
                 bestBoards.append(possibleBoard)
+            if(alpha_beta[0] == None or bestScore < alpha_beta[0]):
+                alpha_beta[0] = bestScore
     select = random.randint(0,len(bestBoards)-1)
     return bestBoards[select]
 
-def minimaxRecursive(data, board, currColor, depth):
-    print("minimaxRecusive depth = ", depth)
+def minimaxRecursive(data, board, currColor, depth, alpha_beta):
+    #print("minimaxRecusive depth = ", depth)
     possibleBoards = possibleMoves(board,currColor,data)
-    print("moves to check: ", len(possibleBoards))
+    #print("moves to check: ", len(possibleBoards))
     if(depth <= 1): #Base Case
         bestBoard = None
         bestScore = None
@@ -381,25 +473,45 @@ def minimaxRecursive(data, board, currColor, depth):
                 if(bestScore == None or boardScore > bestScore):
                     bestScore = boardScore
                     bestBoard = possibleBoard
+                if(alpha_beta[1] == None or bestScore > alpha_beta[1]):
+                    alpha_beta[1] = bestScore
+                if(alpha_beta[0] != None and bestScore > alpha_beta[0]):
+                    #apply alpha-beta prunning
+                    break
             elif(currColor == "white"):
                 if(bestScore == None or boardScore < bestScore):
                     bestScore = boardScore
                     bestBoard = possibleBoard
+                if(alpha_beta[0] == None or bestScore < alpha_beta[0]):
+                    alpha_beta[0] = bestScore
+                if(alpha_beta[1] != None and bestScore < alpha_beta[1]):
+                    #apply alpha-beta prunning
+                    break
         return bestScore
     else: #recursive case
         nextColor = getOpposingColor(currColor)
         bestBoard = None
         bestScore = None
         for possibleBoard in possibleBoards:
-            boardScore = minimaxRecursive(data,possibleBoard,nextColor,depth-1)
+            boardScore = minimaxRecursive(data,possibleBoard,nextColor,depth-1,alpha,beta)
             if(currColor == "black"):
                 if(bestScore == None or boardScore > bestScore):
                     bestScore = boardScore
                     bestBoard = possibleBoard
+                if(beta == None or bestScore > beta):
+                    beta = bestScore
+                if(alpha_beta[0] != None and bestScore > alpha_beta[0]):
+                    #apply alpha-beta prunning
+                    break
             elif(currColor == "white"):
                 if(bestScore == None or boardScore < bestScore):
                     bestScore = boardScore
                     bestBoard = possibleBoard
+                if(alpha == None or bestScore < alpha):
+                    alpha = bestScore
+                if(alpha_beta[1] != None and bestScore < alpha_beta[1]):
+                    #apply alpha-beta prunning
+                    break
         return bestScore
 
 def possibleChains(board,currColor,data):
@@ -567,7 +679,7 @@ def boardEvaluator(board, data):
     #High positive numbers indicate a black is winning, 
     #high negatives indicate white is winning.
     boardScore = 0
-    boardScore += 10*evaluatePieceDifference(board, data)
+    boardScore += 20*evaluatePieceDifference(board, data)
     boardScore += evaluateControlOfCenter(board, data)
     return boardScore
 
@@ -636,7 +748,7 @@ def run(width=300, height=300):
     data = Struct()
     data.width = width
     data.height = height
-    data.timerDelay = 1000 # milliseconds
+    data.timerDelay = 400 # milliseconds
     initMenu(data)
     # create the root and the canvas
     root = Tk()
