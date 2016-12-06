@@ -1,8 +1,8 @@
-Welcome to AlphaAbalone, click on one of the white pieces to get started..
+Welcome to AlphaAbalone, click on one of the white pieces to get started.
 Good Job! You just made a selection.
 In Abalone, you can move more than one piece at a time by forming a chain.
 Click on an adjacent piece to select a chain.
 Great! Now move the chain by clicking on an open space adjacent to your last selection
 You have successfully learned the controls!
-The goal of the game is to use these chains to push your opponents pieces off the board
+The goal of the game is to use these chains to push six of your opponents pieces off the board
 Larger chains can push smaller chains, but chains of equal length cannot push each other

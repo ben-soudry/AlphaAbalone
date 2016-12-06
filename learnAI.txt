@@ -1,0 +1,9 @@
+The AI works by generating lists of all possible moves, and uses this to form a tree of game states.
+At the bottom level of the tree, the AI uses a board evaluator function to assign a score to each board based on how good the position is.
+Next, the AI makes assigns values to the remaining nodes of the tree by assuming that each player will choose the best move it can.
+Finally, the AI picks the node that with the best score, and makes that move.
+This approach is called minimax, because the algorithm minimizes the best move your opponent can make.
+Minimax is very effective for games like chess, since on average there are only 35 moves you could make each turn.
+Minimax is more challenging for Abalone, because there are around 70 moves you can make per turn.
+To speed up the algorithm, an optimization called Alpha-Beta Prunning is used.
+Alpha-Beta Prunning stops searching branches of the game tree if it becomes clear that this state will never be reached.

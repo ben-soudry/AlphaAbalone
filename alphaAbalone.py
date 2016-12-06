@@ -14,10 +14,11 @@ def generalInit(data):
     data.pieceRadius = 26 *data.boardWidth/550
     data.selectionRadius = 30 *data.boardWidth/550
     data.textHeight = 30
-    data.turnCount = 0
+    data.turnCount = 1
     data.howToStep = 1
     initMenuButtons(data)
-
+    #minimax image taken from:
+    #http://mnemstudio.org/ai/game/images/minimax_move_tree1.gif
     data.turn = "white"
     data.gameOver = False
     data.selectedPieces = {}
@@ -43,6 +44,7 @@ def initGame(data):
     data.buttonOffset = 20 
     data.buttonWidth = 140
     data.buttonHeight = 210
+    data.minimaxTree = PhotoImage(file="minimax_move_tree1.gif")
     generalInit(data)
 
 def setUpBoard(data):
@@ -137,8 +139,7 @@ def getMouseInput(event,data):
                     print("clicked on" , row, col)
                     humanControl(row,col,data)
 def keyPressed(event, data):
-    if(event.keysym =='r' and (data.gameOver == True
-      or data.gameMode == "how_to_play" or data.gameMode == "learn_AI")):
+    if(event.keysym == 'r'):
         data.gameMode == "menu"
         initMenu(data)
 
@@ -189,6 +190,7 @@ def redrawAll(canvas, data):
         drawPieces(canvas, data)
         drawMenuButtons(canvas, data)
         drawAIGameText(canvas,data)
+        drawTurnCount(canvas, data)
         if(data.gameOver == True):
             drawGameOverText(canvas, data)
     elif(data.gameMode == "human_game"):
@@ -196,6 +198,7 @@ def redrawAll(canvas, data):
         drawPieces(canvas, data)
         drawMenuButtons(canvas, data)
         drawHumanGameText(canvas,data)
+        drawTurnCount(canvas, data)
         if(data.gameOver == True):
             drawGameOverText(canvas, data)
     elif(data.gameMode == "how_to_play"):
@@ -205,6 +208,7 @@ def redrawAll(canvas, data):
         drawPieces(canvas, data)
     elif(data.gameMode == "learn_AI"):
         drawTitleText(canvas, data)
+        drawLearnAI(canvas,data)
 
 def drawTitleText(canvas,data):
     canvas.create_text(data.width//2,data.textHeight,text = "AlphaAbalone",
@@ -212,11 +216,26 @@ def drawTitleText(canvas,data):
 def drawDescription(canvas,data):
     heightFactor = 2.5
     canvas.create_text(data.width//2,data.textHeight*heightFactor,
-        text = "Abalone Board game with AI", font = "System 12")
+    text = "Abalone Board game with AI", font = "System 12")
     canvas.create_text(data.width//2,data.textHeight*(heightFactor+1),
-        text = "Using Minimax Algorithm with Alpha-Beta Prunning", font = "System 12")
-    canvas.create_text(data.width//2,data.height-data.textHeight*(heightFactor+1),
-        text = "A 15-112 Term Project By Ben Soudry", font = "System 12")
+    text="Using Minimax Algorithm with Alpha-Beta Prunning",font ="System 12")
+    canvas.create_text(data.width//2,
+    data.height-data.textHeight*(heightFactor+1),
+    text = "A 15-112 Term Project By Ben Soudry", font = "System 12")
+def drawLearnAI(canvas,data):
+    heightFactor = 18
+    AITextHeight = 60
+    textFile = open('learnAI.txt', 'r')
+    AIText = textFile.read()
+    AITextLines = AIText.splitlines()
+    for i in range(len(AITextLines)):
+        canvas.create_text(data.width//2,AITextHeight+(i+1)*heightFactor,
+        text = AITextLines[i], font = "System 10")
+        pass
+    canvas.create_text(data.width//2,data.height-AITextHeight//2,
+        text = "Press r to return to the menu", font = "System 12")
+    imageHeight =2*data.height//3
+    canvas.create_image(data.width//2,imageHeight, image = data.minimaxTree)
 def drawGameOverText(canvas, data):
     heightFactor = 1.5
     canvas.create_text(data.width//2,data.textHeight*heightFactor,
@@ -276,6 +295,7 @@ def drawAIGameText(canvas,data):
         data.topY+statusTextHeight, anchor = "nw",
         text = "Thinking...", font = "System 20")
     drawPieceCount(canvas,data)
+
 def drawHumanGameText(canvas,data):
     textShift = 5
     statusTextHeight = 45
@@ -300,8 +320,15 @@ def drawPieceCount(canvas,data):
     whitePieceCount = pieceCount(data, "white")
     canvas.create_text(data.leftX+textShift,data.topY+2*statusTextHeight,
     anchor = "nw",text="Piece count: "+str(whitePieceCount),font = "Ariel 18")
-    canvas.create_text(data.leftX+textShift,data.innerBottomY+2*statusTextHeight,
+    canvas.create_text(data.leftX+textShift,
+    data.innerBottomY+2*statusTextHeight,
     anchor = "nw",text="Piece count: "+str(blackPieceCount),font = "Ariel 18")
+def drawTurnCount(canvas,data):
+    textShift = 5
+    statusTextHeight = 45
+    canvas.create_text(data.innerRightX+textShift,data.topY+statusTextHeight,
+    anchor = "ne",text="Turn "+str(data.turnCount),font = "Ariel 18")
+
 def initMenuButtons(data):
     #Variables for positioning the buttons
     data.leftX=data.width//2-data.boardWidth//2-data.buttonOffset
@@ -494,6 +521,7 @@ def minimax(data,depth):
     bestBoards = []
     bestScore = None
     alpha_beta = [None,None]
+    print(depth*"   " +currColor +" moves to check: ", len(possibleBoards))  
     for possibleBoard in possibleBoards:
          boardScore = minimaxRecursive(data,possibleBoard,nextColor,depth-1,
             alpha_beta)
@@ -503,51 +531,49 @@ def minimax(data,depth):
                 bestBoards = [possibleBoard]
             elif(boardScore == bestScore):
                 bestBoards.append(possibleBoard)
-            if(alpha_beta[1] == None or bestScore > alpha_beta[1]):
-                alpha_beta[1] = bestScore
+
          elif(data.turn == "white"):
             if(bestScore == None or boardScore < bestScore):
                 bestScore = boardScore
                 bestBoards = [possibleBoard]
             elif(boardScore == bestScore):
                 bestBoards.append(possibleBoard)
-            if(alpha_beta[0] == None or bestScore < alpha_beta[0]):
-                alpha_beta[0] = bestScore
     select = random.randint(0,len(bestBoards)-1)
     return bestBoards[select]
 
 def minimaxRecursive(data, board, currColor, depth, alpha_beta):
     #print("minimaxRecusive depth = ", depth)
     possibleBoards = possibleMoves(board,currColor,data)
-    #print("moves to check: ", len(possibleBoards))   
+    print(depth*"   " +currColor +" moves to check: ", len(possibleBoards))   
     if(depth <= 1): #Base Case
-        return minimaxBaseCase(data, board, currColor, depth, alpha_beta, possibleBoards)
+        return minimaxBaseCase(data, board, currColor, 
+        depth, alpha_beta, possibleBoards)
     else: #recursive case
+        bestScore = None
+        bestBoard = None
         nextColor = getOpposingColor(currColor)
         for possibleBoard in possibleBoards:
-            boardScore = minimaxRecursive(data,possibleBoard,nextColor,depth-1,alpha_beta)
+            boardScore = minimaxRecursive(data,possibleBoard,
+            nextColor,depth-1,alpha_beta)
             if(currColor == "black"):
                 if(bestScore == None or boardScore > bestScore):
                     bestScore = boardScore
                     bestBoard = possibleBoard
-                if(beta == None or bestScore > beta):
-                    beta = bestScore
             elif(currColor == "white"):
                 if(bestScore == None or boardScore < bestScore):
                     bestScore = boardScore
                     bestBoard = possibleBoard
-                if(alpha == None or bestScore < alpha):
-                    alpha = bestScore
             if(canAlphaBetaPrun(alpha_beta,bestScore,currColor)):
                 break
         return bestScore
 def canAlphaBetaPrun(alpha_beta,bestScore,currColor):
     if(currColor == "white"):
-        return (alpha_beta[1] != None and bestScore < alpha_beta[1])
+        return (alpha_beta[1] != None and bestScore > alpha_beta[1])
     elif(currColor == "black"):
-        return (alpha_beta[0] != None and bestScore > alpha_beta[0])
+        return (alpha_beta[0] != None and bestScore < alpha_beta[0])
 def minimaxBaseCase(data, board, currColor, depth, alpha_beta, possibleBoards):
-    #Once the algorithm reaches depth 1, use the boardEvaluator to score the possibleBoards.
+    #Once the algorithm reaches depth 1,
+    #use the boardEvaluator to score the possibleBoards.
     bestBoard = None
     bestScore = None
     for possibleBoard in possibleBoards:
