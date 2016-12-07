@@ -23,6 +23,7 @@ def generalInit(data):
     data.gameOver = False
     data.selectedPieces = {}
     data.lastHex = None
+    data.buttonsEnabled = False
 
     createBoardLists(data)
     setUpBoard(data)
@@ -120,6 +121,7 @@ def assign3AxisCoords(data):
             currZ = -1*(currX + currY)
             data.board3AxisCoords[row][col] = (currX, currY,currZ)
 def mousePressed(event, data):
+    print("clicked at: ", event.x, ",",event.y)
     if(data.gameMode == "human_game" and data.gameOver == False):
         getMouseInput(event,data)
     elif(data.gameMode == "AI_game" and data.turn == "black"
@@ -127,6 +129,8 @@ def mousePressed(event, data):
         getMouseInput(event,data)
     elif(data.gameMode == "how_to_play"):
         getMouseInput(event,data)
+
+
 def getMouseInput(event,data):
     #Selector for making human moves
         for row in range(len(data.boardScreenPos)):
@@ -179,16 +183,16 @@ def timerFired(data):
 
 def redrawAll(canvas, data):
     if(data.gameMode == "menu"):
+        drawPanels(canvas, data, enableButtons = True)
         drawTitleText(canvas, data)
         drawDescription(canvas,data)
         drawBoard(canvas, data, data.width//2, data.height//2)
-        drawMenuButtons(canvas, data, enableButtons = True)
         drawButtonText(canvas,data)
         drawPieces(canvas, data)
     elif(data.gameMode == "AI_game" ):
         drawBoard(canvas, data)
         drawPieces(canvas, data)
-        drawMenuButtons(canvas, data)
+        drawPanels(canvas, data)
         drawAIGameText(canvas,data)
         drawTurnCount(canvas, data)
         if(data.gameOver == True):
@@ -196,7 +200,7 @@ def redrawAll(canvas, data):
     elif(data.gameMode == "human_game"):
         drawBoard(canvas, data)
         drawPieces(canvas, data)
-        drawMenuButtons(canvas, data)
+        drawPanels(canvas, data)
         drawHumanGameText(canvas,data)
         drawTurnCount(canvas, data)
         if(data.gameOver == True):
@@ -341,7 +345,7 @@ def initMenuButtons(data):
     data.innerTopY = data.height//2-data.buttonOffset
     data.bottomY = data.height//2+data.buttonOffset+data.buttonHeight
     data.innerBottomY = data.height//2+data.buttonOffset
-def drawMenuButtons(canvas,data, enableButtons = False):
+def drawPanels(canvas,data, enableButtons = False):
     tan30 = math.tan(math.pi/6)
     button1 = canvas.create_polygon((data.innerLeftX, data.innerTopY),
         (data.leftX,data.innerTopY),(data.leftX,data.topY),
@@ -359,7 +363,7 @@ def drawMenuButtons(canvas,data, enableButtons = False):
         (data.rightX,data.innerBottomY),(data.rightX,data.bottomY),
         (data.innerRightX-data.buttonHeight*tan30,data.bottomY),
         fill = "gray")
-    if(enableButtons == True):
+    if(enableButtons):
         canvas.tag_bind(button1, '<ButtonPress-1>',
         lambda event:humanGameButtonPressed(event, data))  
         canvas.tag_bind(button2, '<ButtonPress-1>', 
@@ -520,11 +524,13 @@ def minimax(data,depth):
     nextColor = getOpposingColor(currColor)
     bestBoards = []
     bestScore = None
+    alpha = None
+    beta = None
     alpha_beta = [None,None]
     print(depth*"   " +currColor +" moves to check: ", len(possibleBoards))  
     for possibleBoard in possibleBoards:
-         boardScore = minimaxRecursive(data,possibleBoard,nextColor,depth-1,
-            alpha_beta)
+         boardScore = alphaBetaRecursive(data,possibleBoard,nextColor,depth-1,
+            alpha,beta)
          if(data.turn == "black"):
             if(bestScore == None or boardScore > bestScore):
                 bestScore = boardScore
@@ -540,11 +546,43 @@ def minimax(data,depth):
                 bestBoards.append(possibleBoard)
     select = random.randint(0,len(bestBoards)-1)
     return bestBoards[select]
+def alphaBetaRecursive(data,board,currColor,depth,alpha,beta):
+    if(depth == 0):
+        print("board evaluated depth = 0")
+        return boardEvaluator(board,data)
+    possibleBoards = possibleMoves(board,currColor,data)
+    print(depth*"   " +currColor +" moves to check: ", len(possibleBoards), " depth: ",depth)   
+    if(currColor == "black"): #maximizer
+        for possibleBoard in possibleBoards:
+            nextColor = getOpposingColor(currColor)
+            boardScore = alphaBetaRecursive(data,possibleBoard,nextColor,
+                    depth-1,alpha,beta)
+            if(alpha == None):
+                alpha = boardScore
+            else:
+                alpha = max(alpha,boardScore)
+            if(alpha != None and beta != None and beta <= alpha):
+                print("prunned!")
+                break
+        return alpha
+    else: #minimizer
+        for possibleBoard in possibleBoards:
+            nextColor = getOpposingColor(currColor)
+            boardScore = alphaBetaRecursive(data,possibleBoard,nextColor,
+                    depth-1,alpha,beta)
+            if(beta == None):
+                beta = boardScore
+            else:
+                beta = min(beta,boardScore)
+            if(alpha != None and beta != None and beta <= alpha):
+                print("prunned!")
+                break
+        return beta
 
 def minimaxRecursive(data, board, currColor, depth, alpha_beta):
     #print("minimaxRecusive depth = ", depth)
     possibleBoards = possibleMoves(board,currColor,data)
-    print(depth*"   " +currColor +" moves to check: ", len(possibleBoards))   
+    #print(depth*"   " +currColor +" moves to check: ", len(possibleBoards))   
     if(depth <= 1): #Base Case
         return minimaxBaseCase(data, board, currColor, 
         depth, alpha_beta, possibleBoards)
@@ -559,18 +597,27 @@ def minimaxRecursive(data, board, currColor, depth, alpha_beta):
                 if(bestScore == None or boardScore > bestScore):
                     bestScore = boardScore
                     bestBoard = possibleBoard
+                if(alpha_beta[0] == None or boardScore > alpha_beta[0]):
+                    alpha_beta[0] = boardScore
+                if(canAlphaBetaPrun(alpha_beta,bestScore,currColor)):
+                    print("Prunned!")
+                    bestScore = alpha_beta[1]
+                    break
             elif(currColor == "white"):
                 if(bestScore == None or boardScore < bestScore):
                     bestScore = boardScore
                     bestBoard = possibleBoard
-            if(canAlphaBetaPrun(alpha_beta,bestScore,currColor)):
-                break
+                if(alpha_beta[1] == None or boardScore < alpha_beta[1]):
+                    alpha_beta[1] = boardScore
+                if(canAlphaBetaPrun(alpha_beta,bestScore,currColor)):
+                    print("Prunned!")
+                    bestScore = alpha_beta[0]
+                    break
         return bestScore
 def canAlphaBetaPrun(alpha_beta,bestScore,currColor):
-    if(currColor == "white"):
-        return (alpha_beta[1] != None and bestScore > alpha_beta[1])
-    elif(currColor == "black"):
-        return (alpha_beta[0] != None and bestScore < alpha_beta[0])
+    print("alpha: "+str(alpha_beta[0])+"<"+str(bestScore)+" < beta: "+str(alpha_beta[1]))
+    if(alpha_beta[0] != None and alpha_beta[1] != None):
+        return (alpha_beta[0] >= alpha_beta[1])
 def minimaxBaseCase(data, board, currColor, depth, alpha_beta, possibleBoards):
     #Once the algorithm reaches depth 1,
     #use the boardEvaluator to score the possibleBoards.
@@ -582,14 +629,14 @@ def minimaxBaseCase(data, board, currColor, depth, alpha_beta, possibleBoards):
             if(bestScore == None or boardScore > bestScore):
                 bestScore = boardScore
                 bestBoard = possibleBoard
-            if(alpha_beta[1] == None or bestScore > alpha_beta[1]):
-                alpha_beta[1] = bestScore
+            if(alpha_beta[0] == None or bestScore > alpha_beta[0]):
+                alpha_beta[0] = bestScore
         elif(currColor == "white"):
             if(bestScore == None or boardScore < bestScore):
                 bestScore = boardScore
                 bestBoard = possibleBoard
-            if(alpha_beta[0] == None or bestScore < alpha_beta[0]):
-                alpha_beta[0] = bestScore
+            if(alpha_beta[1] == None or bestScore < alpha_beta[1]):
+                alpha_beta[1] = bestScore 
             if(canAlphaBetaPrun(alpha_beta,bestScore,currColor)):
                 break
     return bestScore
@@ -804,7 +851,8 @@ def evaluateCompactness(board):
 ####################################
 # use the run function as-is
 ####################################
-##Citation: Tkinter MVC taken from 15-112 website
+##Citation: Tkinter MVC taken from 15-112 website:
+##http://www.cs.cmu.edu/~112/notes/notes-animations.html
 def run(width=300, height=300):
     def redrawAllWrapper(canvas, data):
         canvas.delete(ALL)
@@ -830,7 +878,7 @@ def run(width=300, height=300):
     data = Struct()
     data.width = width
     data.height = height
-    data.timerDelay = 400 # milliseconds
+    data.timerDelay = 100 # milliseconds
     initMenu(data)
     # create the root and the canvas
     root = Tk()
