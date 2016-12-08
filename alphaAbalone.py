@@ -45,9 +45,14 @@ def initGame(data):
     data.buttonOffset = 20 
     data.buttonWidth = 140
     data.buttonHeight = 210
-    data.minimaxTree = PhotoImage(file="minimax_move_tree1.gif")
-    generalInit(data)
 
+    generalInit(data)
+def initLearnAI(data):
+    try:
+        data.minimaxTree = PhotoImage(file="minimax_move_tree1.gif")
+    except:
+        data.minimaxTree = None
+    generalInit(data)
 def setUpBoard(data):
     #white - fill first two lines
     linesToFill = 2
@@ -122,14 +127,32 @@ def assign3AxisCoords(data):
             data.board3AxisCoords[row][col] = (currX, currY,currZ)
 def mousePressed(event, data):
     print("clicked at: ", event.x, ",",event.y)
-    if(data.gameMode == "human_game" and data.gameOver == False):
+    if(data.gameMode == "menu"):
+        registerButtonPresses(event,data)
+    elif(data.gameMode == "human_game" and data.gameOver == False):
         getMouseInput(event,data)
     elif(data.gameMode == "AI_game" and data.turn == "black"
         and data.gameOver == False):
         getMouseInput(event,data)
     elif(data.gameMode == "how_to_play"):
         getMouseInput(event,data)
-
+def registerButtonPresses(event,data):
+    tan30 = math.tan(math.pi/6)
+    if(event.x>data.leftX and 
+        event.x<data.innerLeftX+data.buttonHeight*tan30 and
+        event.y>data.topY and event.y<data.innerTopY):
+        humanGameButtonPressed(event,data)
+    elif(event.x>data.leftX and 
+        event.x<data.innerLeftX+data.buttonHeight*tan30 and
+        event.y>data.innerBottomY and event.y<data.bottomY):
+            AIGameButtonPressed(event,data)
+    elif(event.x>data.innerRightX-data.buttonHeight*tan30 and 
+        event.x<data.rightX and event.y>data.topY and event.y<data.innerTopY):
+        howToPlayButtonPressed(event,data)
+    elif(event.x>data.innerRightX-data.buttonHeight*tan30 and 
+        event.x<data.rightX and event.y>data.innerBottomY and 
+        event.y<data.bottomY):
+        learnAIButtonPressed(event,data)
 
 def getMouseInput(event,data):
     #Selector for making human moves
@@ -168,7 +191,7 @@ def howToPlayButtonPressed(event,data):
     initMenu(data)
     data.gameMode = "how_to_play"
 def learnAIButtonPressed(event,data):
-    initGame(data)
+    initLearnAI(data)
     data.gameMode = "learn_AI"
 def timerFired(data):
     if(data.gameMode == "AI_game" and data.turn == "white"
@@ -229,7 +252,13 @@ def drawDescription(canvas,data):
 def drawLearnAI(canvas,data):
     heightFactor = 18
     AITextHeight = 60
-    textFile = open('learnAI.txt', 'r')
+    try:
+        textFile = open('learnAI.txt', 'r')
+    except:
+        canvas.create_text(data.width//2,AITextHeight+heightFactor,
+        text = "Error, could not read learnAI.txt, unzip the project folder",
+         font = "System 10")
+        return
     AIText = textFile.read()
     AITextLines = AIText.splitlines()
     for i in range(len(AITextLines)):
@@ -239,7 +268,12 @@ def drawLearnAI(canvas,data):
     canvas.create_text(data.width//2,data.height-AITextHeight//2,
         text = "Press r to return to the menu", font = "System 12")
     imageHeight =2*data.height//3
-    canvas.create_image(data.width//2,imageHeight, image = data.minimaxTree)
+    if(data.minimaxTree != None):
+        canvas.create_image(data.width//2,imageHeight, image = data.minimaxTree)
+    else:
+        canvas.create_text(data.width//2,imageHeight,
+        text="Error: could not open minimax_move_tree1.gif, unzip the project folder",
+        font="System 12")
 def drawGameOverText(canvas, data):
     heightFactor = 1.5
     canvas.create_text(data.width//2,data.textHeight*heightFactor,
@@ -247,7 +281,13 @@ def drawGameOverText(canvas, data):
 def drawHowToText(canvas, data):
     heightFactor = 18
     howToTextHeight = 60
-    textFile = open('howToText.txt', 'r')
+    try:
+        textFile = open('howToText.txt', 'r')
+    except:
+        canvas.create_text(data.width//2,howToTextHeight+heightFactor,
+        text = "Error, could not read howToText.txt, unzip the project folder",
+        font = "System 10")
+        return
     howToText = textFile.read()
     howToTextLines = howToText.splitlines()
     canvas.create_text(data.width//2,data.height-howToTextHeight,
@@ -363,15 +403,6 @@ def drawPanels(canvas,data, enableButtons = False):
         (data.rightX,data.innerBottomY),(data.rightX,data.bottomY),
         (data.innerRightX-data.buttonHeight*tan30,data.bottomY),
         fill = "gray")
-    if(enableButtons):
-        canvas.tag_bind(button1, '<ButtonPress-1>',
-        lambda event:humanGameButtonPressed(event, data))  
-        canvas.tag_bind(button2, '<ButtonPress-1>', 
-        lambda event:AIGameButtonPressed(event, data)) 
-        canvas.tag_bind(button3, '<ButtonPress-1>', 
-        lambda event:howToPlayButtonPressed(event, data)) 
-        canvas.tag_bind(button4, '<ButtonPress-1>',
-        lambda event:learnAIButtonPressed(event, data)) 
     pass
 
 def drawBoard(canvas, data, cx=None,cy =None):
@@ -548,10 +579,11 @@ def minimax(data,depth):
     return bestBoards[select]
 def alphaBetaRecursive(data,board,currColor,depth,alpha,beta):
     if(depth == 0):
-        print("board evaluated depth = 0")
+        #print("board evaluated depth = 0")
         return boardEvaluator(board,data)
     possibleBoards = possibleMoves(board,currColor,data)
-    print(depth*"   " +currColor +" moves to check: ", len(possibleBoards), " depth: ",depth)   
+    #print(depth*"   " +currColor +" moves to check: ",
+    #len(possibleBoards), " depth: ",depth)   
     if(currColor == "black"): #maximizer
         for possibleBoard in possibleBoards:
             nextColor = getOpposingColor(currColor)
@@ -579,13 +611,13 @@ def alphaBetaRecursive(data,board,currColor,depth,alpha,beta):
                 break
         return beta
 
-def minimaxRecursive(data, board, currColor, depth, alpha_beta):
+def minimaxRecursive(data, board, currColor, depth):
     #print("minimaxRecusive depth = ", depth)
     possibleBoards = possibleMoves(board,currColor,data)
     #print(depth*"   " +currColor +" moves to check: ", len(possibleBoards))   
     if(depth <= 1): #Base Case
         return minimaxBaseCase(data, board, currColor, 
-        depth, alpha_beta, possibleBoards)
+        depth, possibleBoards)
     else: #recursive case
         bestScore = None
         bestBoard = None
@@ -597,28 +629,12 @@ def minimaxRecursive(data, board, currColor, depth, alpha_beta):
                 if(bestScore == None or boardScore > bestScore):
                     bestScore = boardScore
                     bestBoard = possibleBoard
-                if(alpha_beta[0] == None or boardScore > alpha_beta[0]):
-                    alpha_beta[0] = boardScore
-                if(canAlphaBetaPrun(alpha_beta,bestScore,currColor)):
-                    print("Prunned!")
-                    bestScore = alpha_beta[1]
-                    break
             elif(currColor == "white"):
                 if(bestScore == None or boardScore < bestScore):
                     bestScore = boardScore
                     bestBoard = possibleBoard
-                if(alpha_beta[1] == None or boardScore < alpha_beta[1]):
-                    alpha_beta[1] = boardScore
-                if(canAlphaBetaPrun(alpha_beta,bestScore,currColor)):
-                    print("Prunned!")
-                    bestScore = alpha_beta[0]
-                    break
         return bestScore
-def canAlphaBetaPrun(alpha_beta,bestScore,currColor):
-    print("alpha: "+str(alpha_beta[0])+"<"+str(bestScore)+" < beta: "+str(alpha_beta[1]))
-    if(alpha_beta[0] != None and alpha_beta[1] != None):
-        return (alpha_beta[0] >= alpha_beta[1])
-def minimaxBaseCase(data, board, currColor, depth, alpha_beta, possibleBoards):
+def minimaxBaseCase(data, board, currColor, depth, possibleBoards):
     #Once the algorithm reaches depth 1,
     #use the boardEvaluator to score the possibleBoards.
     bestBoard = None
@@ -878,7 +894,7 @@ def run(width=300, height=300):
     data = Struct()
     data.width = width
     data.height = height
-    data.timerDelay = 100 # milliseconds
+    data.timerDelay = 500 # milliseconds
     initMenu(data)
     # create the root and the canvas
     root = Tk()
